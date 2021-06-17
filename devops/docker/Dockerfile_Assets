@@ -1,0 +1,6 @@
+FROM alpine:3.13
+RUN adduser -D -s /bin/sh assets_user && apk --no-cache add python3=3.8.10-r0
+WORKDIR /home/assets_user
+USER assets_user
+COPY build/static.tgz /home/assets_user/
+COPY build/serve.py /home/assets_user/

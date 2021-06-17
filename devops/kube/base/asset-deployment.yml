@@ -1,0 +1,25 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: asset-container
+  name: asset
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: asset-container
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: asset
+    spec:
+      containers:
+      - command: ["java", "-jar", "quotes.jar"]
+        image: tw.own.registry.com/asset-server
+        imagePullPolicy: Always
+        name: asset-container
+        resources: {}
+      restartPolicy: Always
+status: {}

@@ -1,0 +1,209 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: asset-container-service
+  namespace: tw-app
+spec:
+  ports:
+  - name: "8000"
+    port: 8000
+    targetPort: 8000
+  selector:
+    app: asset-container
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: feed-container-service
+  namespace: tw-app
+spec:
+  ports:
+  - name: "7720"
+    port: 7720
+    targetPort: 7720
+  selector:
+    app: feed-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: front
+  name: front-container-service
+  namespace: tw-app
+spec:
+  ports:
+  - name: "7730"
+    port: 7730
+    targetPort: 7730
+  selector:
+    app: front-container
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: quotes-container-service
+  namespace: tw-app
+spec:
+  ports:
+  - name: "7710"
+    port: 7710
+    targetPort: 7710
+  selector:
+    app: quotes-service
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: asset-container
+  name: asset
+  namespace: tw-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: asset-container
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: asset
+    spec:
+      containers:
+      - command:
+        - java
+        - -jar
+        - quotes.jar
+        image: tw.own.registry.com/asset-server
+        name: asset-container
+        resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: feed-container
+  name: feed
+  namespace: tw-app
+spec:
+  labels:
+    matchLabels:
+      app: feed-container
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: feed-container
+    spec:
+      containers:
+      - command:
+        - java
+        - -jar
+        - newsfeed.jar
+        env:
+        - name: APP_PORT
+          value: "7720"
+        image: tw.own.registry.com/backend_feed
+        name: feed
+        resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: front-container
+  name: front
+  namespace: tw-app
+spec:
+  labels:
+    matchLabels:
+      app: front-container
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: front-container
+    spec:
+      containers:
+      - command:
+        - java
+        - -jar
+        - front-end.jar
+        env:
+        - name: APP_PORT
+          value: "7730"
+        - name: NEWSFEED_SERVICE_URL
+          value: http://feed-container-service.tw-app.svc.cluster.local:7720
+        - name: QUOTE_SERVICE_URL
+          value: http://quotes-container-service.tw-app.svc.cluster.local:7710
+        - name: STATIC_URL
+          value: http://asset-container-service.tw-app.svc.cluster.local:8000
+        - name: NEWSFEED_SERVICE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: newsFeedServiceToken
+              name: newsFeedServiceToken
+        image: tw.own.registry.com/frontend
+        name: front
+        ports:
+        - containerPort: 7730
+        resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: quotes-container
+  name: quotes
+  namespace: tw-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: quotes-container
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: quotes-container
+    spec:
+      containers:
+      - command:
+        - java
+        - -jar
+        - quotes.jar
+        env:
+        - name: APP_PORT
+          value: "7710"
+        image: tw.own.registry.com/backend_quote
+        name: quotes
+        resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: front-container-ingress
+  namespace: tw-app
+spec:
+  rules:
+  - host: tw-app.host.de
+    http:
+      paths:
+      - backend:
+          serviceName: front-container-service
+          servicePort: 7730
+        path: /
+  tls:
+  - hosts:
+    - tw-app.host.de

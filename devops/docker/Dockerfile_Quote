@@ -1,0 +1,6 @@
+FROM adoptopenjdk/openjdk8:jre8u292-b10-alpine
+ENV APP_PORT 7730
+RUN adduser -D -s /bin/sh quoteuser
+WORKDIR /home/quoteuser
+USER quoteuser
+COPY build/quotes.jar /home/quoteuser/

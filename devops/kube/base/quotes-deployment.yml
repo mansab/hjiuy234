@@ -1,0 +1,32 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: quotes-container
+  name: quotes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: quotes-container
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: quotes-container
+    spec:
+      containers:
+      - env:
+        - name: APP_PORT
+          value: "7710"
+        command: ["java", "-jar", "quotes.jar"]
+        image: tw.own.registry.com/backend_quote
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 7710
+        restartPolicy: Always
+        name: quotes
+        resources: {}
+      restartPolicy: Always
+status: {}

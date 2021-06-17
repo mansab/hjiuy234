@@ -1,0 +1,78 @@
+name: build-and-deploy
+on: 
+  push:
+    branches:
+      - 'main'
+jobs:
+
+  build-app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-java@v2
+        with:
+          distribution: 'adopt'
+          java-version: '8'
+      - run: test -d $HOME/bin || mkdir $HOME/bin
+      - run: |
+          wget -q -O $HOME/bin/lein \
+              https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein \
+                  && chmod +x $HOME/bin/lein
+      - run: export PATH:$HOME/bin:$PATH
+      - run: make libs && make clean all && cp front-end/public/serve.py build/ 
+      - run: make test
+      - name: Cache artifacts
+        uses: actions/cache@v2
+        with:
+          path: build
+          key: build_result
+
+  containerize-app:
+    runs-on: ubuntu-latest
+    container: docker:stable
+    env:
+      DOCKER_REGISTRY_ADDRESS: "tw.own.registry.com"
+    steps:
+      - uses: actions/checkout@v2
+      - run: docker login -u ${{ secrets.MTR_USER }} -p ${{ secrets.MTR_PASSWD }} $DOCKER_REGISTRY_ADDRESS
+      - run: |
+          docker build --tag ${{ env.DOCKER_REGISTRY_ADDRESS }}/asset-server:latest -f devops/docker/Dockerfile_Assets . &&\
+            docker build --tag ${{ env.DOCKER_REGISTRY_ADDRESS }}/frontend:latest -f devops/docker/Dockerfile_Front . &&\
+              docker build --tag ${{ env.DOCKER_REGISTRY_ADDRESS }}/backend_feed:latest -f devops/docker/Dockerfile_Feed . &&\
+                docker build --tag ${{ env.DOCKER_REGISTRY_ADDRESS }}/backend_quote:latest -f devops/docker/Dockerfile_Quote 
+      - run: test -d $HOME/bin || mkdir $HOME/bin
+      - run: wget -qO- https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b $HOME/bin
+      - run: export PATH:$HOME/bin:$PATH
+      - name: Run security check on docker images
+        run: |
+          grype -f high ${{ env.DOCKER_REGISTRY_ADDRESS }}/asset-server:latest &&\
+            grype -f high ${{ env.DOCKER_REGISTRY_ADDRESS }}/frontend:latest &&\
+              grype -f high ${{ env.DOCKER_REGISTRY_ADDRESS }}/backend_feed:latest &&\
+                grype -f high ${{ env.DOCKER_REGISTRY_ADDRESS }}/backend_quote:latest
+      - run: |
+          docker push ${{ env.DOCKER_REGISTRY_ADDRESS }}/asset-server:latest &&\
+            docker push ${{ env.DOCKER_REGISTRY_ADDRESS }}/frontend:latest &&\
+              docker push ${{ env.DOCKER_REGISTRY_ADDRESS }}/backend_feed:latest &&\
+                docker push ${{ env.DOCKER_REGISTRY_ADDRESS }}/backend_quote:latest
+                
+  validate-k-manifests:
+    runs-on: ubuntu-latest
+    container: docker:stable
+    steps:
+      - uses: actions/checkout@v2
+      - name: Create tmp manifest for validation
+        run: docker run -it --rm -v $(readlink -f devops/kube):/kustomize/:z docker.io/codekoala/kustomize kustomize build /kustomize/overlays/main > manifest.yml
+      - name: Validate tmp manifest
+        run: docker run --entrypoint='' -it --rm -v $(readlink -f manifest.yml):/manifest.yml:z garethr/kubeval sh -c 'cat manifest.yml | kubeval'
+      
+
+  push-to-k8s:
+    runs-on: ubuntu-latest
+    steps: 
+      - uses: actions/checkout@v2
+      - name: deploy-to-k8s
+        uses: steebchen/kubectl@master
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA  }}
+        with:
+          args: "apply -k devops/kube/overlays/main"

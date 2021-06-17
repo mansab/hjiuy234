@@ -1,0 +1,6 @@
+FROM adoptopenjdk/openjdk8:jre8u292-b10-alpine
+ENV APP_PORT 7710
+RUN adduser -D -s /bin/sh feeduser
+WORKDIR /home/feeduser
+USER feeduser
+COPY build/newsfeed.jar /home/feeduser/

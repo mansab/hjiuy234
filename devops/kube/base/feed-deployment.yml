@@ -1,0 +1,32 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: feed-container
+  name: feed
+spec:
+  replicas: 1
+  labels:
+    matchLabels:
+      app: feed-container
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: feed-container
+    spec:
+      containers:
+      - env:
+        - name: APP_PORT
+          value: "7720"
+        command: ["java", "-jar", "newsfeed.jar"]
+        image: tw.own.registry.com/backend_feed
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 7720
+        restartPolicy: Always
+        name: feed
+        resources: {}
+      restartPolicy: Always
+status: {}

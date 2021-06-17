@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: front-container-ingress
+spec:
+  rules:
+  - host: tw-app.host.de
+    http:
+      paths:
+      - backend:
+          serviceName: front-container-service
+          servicePort: 7730
+        path: /
+  tls:
+  - hosts:
+    - tw-app.host.de

@@ -1,0 +1,45 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: front-container
+  name: front
+spec:
+  replicas: 1
+  labels:
+    matchLabels:
+      app: front-container
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: front-container
+    spec:
+      containers:
+      - env:
+        - name: APP_PORT
+          value: "7730"
+        - name: NEWSFEED_SERVICE_URL
+          value: http://feed-container-service.tw-app.svc.cluster.local:7720
+        - name: QUOTE_SERVICE_URL
+          value: http://quotes-container-service.tw-app.svc.cluster.local:7710
+        - name: STATIC_URL
+          value: http://asset-container-service.tw-app.svc.cluster.local:8000
+        - name: NEWSFEED_SERVICE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: newsFeedServiceToken
+              key: newsFeedServiceToken
+        command: ["java","-jar","front-end.jar"]
+        image: tw.own.registry.com/frontend
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 7730
+        restartPolicy: Always
+        name: front
+        ports:
+        - containerPort: 7730
+        resources: {}
+      restartPolicy: Always
+status: {}

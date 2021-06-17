@@ -1,0 +1,5 @@
+FROM adoptopenjdk/openjdk8:jre8u292-b10-alpine
+RUN adduser -D -s /bin/sh frontuser
+WORKDIR /home/frontuser
+USER frontuser
+COPY build/front-end.jar /home/frontuser/
